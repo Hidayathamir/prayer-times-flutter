@@ -3,10 +3,12 @@ import 'package:adhan/adhan.dart';
 import 'package:intl/intl.dart';
 import 'notification_service.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz2;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Required when using async in main
   tz.initializeTimeZones();
+  tz2.setLocalLocation(tz2.getLocation('Asia/Jakarta')); // Set local timezone!
   await NotificationService.init(); // Start the notification engine
   runApp(const MaterialApp(home: PrayerTimesScreen()));
 }
@@ -60,14 +62,62 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Jakarta Prayer Times')),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.notifications),
-        onPressed: () {
-          NotificationService.showInstantNotification(
-            'Test',
-            'This is a notification from Flutter!',
-          );
-        },
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton(
+            heroTag: 'instant',
+            child: const Icon(Icons.flash_on),
+            onPressed: () async {
+              print("Firing instant notification NOW");
+              await NotificationService.showInstantNotification(
+                'Instant Test',
+                'This notification should appear RIGHT NOW!',
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Instant notification fired!')),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton(
+            heroTag: 'direct_schedule',
+            backgroundColor: Colors.green,
+            child: const Icon(Icons.timer),
+            onPressed: () async {
+              print("Direct schedule test: 10 seconds from now");
+              await NotificationService.scheduleDirectTest(
+                888,
+                const Duration(seconds: 10),
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Direct schedule! Wait 10 sec...')),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton(
+            heroTag: 'scheduled',
+            child: const Icon(Icons.notifications),
+            onPressed: () async {
+              final fakePrayerTime = DateTime.now().add(
+                const Duration(minutes: 15, seconds: 10),
+              );
+
+              print("Scheduling test for: $fakePrayerTime");
+
+              await NotificationService.schedulePrayerReminder(
+                999, // Test ID
+                'Test Maghrib',
+                fakePrayerTime,
+              );
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Scheduled! Wait ~10 seconds...')),
+              );
+            },
+          ),
+        ],
       ),
       body: ListView(
         children: [
