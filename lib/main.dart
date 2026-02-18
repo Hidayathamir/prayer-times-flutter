@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:adhan/adhan.dart';
 import 'package:intl/intl.dart';
 import 'notification_service.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Required when using async in main
+  tz.initializeTimeZones();
   await NotificationService.init(); // Start the notification engine
   runApp(const MaterialApp(home: PrayerTimesScreen()));
 }
@@ -29,19 +31,26 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   }
 
   void _calculatePrayers() {
-    // HARDCODED LOCATION: Jakarta (We will make this dynamic later)
-    final myCoordinates = Coordinates(-6.2088, 106.8456);
-
-    // Calculation parameters (standard for Indonesia/Singapore)
+    final myCoordinates = Coordinates(-6.2088, 106.8456); // Jakarta
     final params = CalculationMethod.singapore.getParameters();
     params.madhab = Madhab.shafi;
-
-    // Calculate for TODAY
     final today = DateComponents.from(DateTime.now());
 
     setState(() {
       prayerTimes = PrayerTimes(myCoordinates, today, params);
     });
+
+    // --- NEW: Schedule Notifications ---
+    // We use unique IDs (1, 2, 3...) for each prayer
+    NotificationService.schedulePrayerReminder(1, 'Fajr', prayerTimes.fajr);
+    NotificationService.schedulePrayerReminder(2, 'Dhuhr', prayerTimes.dhuhr);
+    NotificationService.schedulePrayerReminder(3, 'Asr', prayerTimes.asr);
+    NotificationService.schedulePrayerReminder(
+      4,
+      'Maghrib',
+      prayerTimes.maghrib,
+    );
+    NotificationService.schedulePrayerReminder(5, 'Isha', prayerTimes.isha);
   }
 
   @override

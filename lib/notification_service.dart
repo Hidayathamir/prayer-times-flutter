@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:intl/intl.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 class NotificationService {
   // 1. Create the plugin instance
@@ -22,6 +25,13 @@ class NotificationService {
     );
 
     await _notifications.initialize(settings: settings);
+
+    // Request notification permission (required on Android 13+)
+    final androidPlugin = _notifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      await androidPlugin.requestNotificationsPermission();
+    }
   }
 
   // 3. Simple Instant Notification (for testing)
@@ -41,5 +51,52 @@ class NotificationService {
       body: body,
       notificationDetails: details,
     );
+  }
+
+  static Future<void> schedulePrayerReminder(
+    int id,
+    String prayerName,
+    DateTime prayerTime,
+  ) async {
+    // 1. Calculate 15 minutes before
+    final reminderTime = prayerTime.subtract(const Duration(minutes: 15));
+
+    // 2. Safety Check: If time has already passed, don't schedule
+    if (reminderTime.isBefore(DateTime.now())) {
+      return;
+    }
+
+    // 3. Convert to "TZDateTime" (Required by the plugin)
+    final tz.TZDateTime scheduledDate = tz.TZDateTime.from(
+      reminderTime,
+      tz.local,
+    );
+
+    // 4. Define the expandable notification style (Android)
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'prayer_channel',
+          'Prayer Reminders',
+          channelDescription: 'Reminders 15m before prayer',
+          importance: Importance.max,
+          priority: Priority.high,
+          styleInformation: BigTextStyleInformation(''), // Makes it expandable
+        );
+
+    const NotificationDetails details = NotificationDetails(
+      android: androidDetails,
+    );
+
+    // 5. Schedule it!
+    await _notifications.zonedSchedule(
+      id: id,
+      title: 'Prayer Upcoming',
+      body: '$prayerName is in 15 minutes (${DateFormat.Hm().format(prayerTime)})',
+      scheduledDate: scheduledDate,
+      notificationDetails: details,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    );
+
+    debugPrint("Scheduled $prayerName reminder for $reminderTime");
   }
 }
