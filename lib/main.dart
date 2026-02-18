@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:adhan/adhan.dart';
 import 'package:intl/intl.dart';
+import 'notification_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized(); // Required when using async in main
+  await NotificationService.init(); // Start the notification engine
   runApp(const MaterialApp(home: PrayerTimesScreen()));
 }
 
@@ -48,6 +51,15 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Jakarta Prayer Times')),
+      floatingActionButton: FloatingActionButton(
+        child: const Icon(Icons.notifications),
+        onPressed: () {
+          NotificationService.showInstantNotification(
+            'Test',
+            'This is a notification from Flutter!',
+          );
+        },
+      ),
       body: ListView(
         children: [
           _buildRow('Fajr', format(prayerTimes.fajr)),
