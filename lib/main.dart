@@ -122,7 +122,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     final lon = prefs.getDouble('city_lon');
 
     if (name != null && lat != null && lon != null) {
-      _cityController.text = name;
       setState(() => selectedCityName = name);
       _updatePrayerTimes(lat, lon, save: false);
     }
@@ -179,7 +178,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
 
   void _onCitySelected(Map<String, dynamic> city) {
     final shortName = city['name'].toString().split(',')[0];
-    _cityController.text = shortName;
     setState(() {
       _suggestions = [];
       selectedCityName = shortName;
@@ -246,7 +244,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                 'Unknown')
           : 'Unknown';
 
-      _cityController.text = cityName;
       setState(() => selectedCityName = cityName);
       _updatePrayerTimes(position.latitude, position.longitude);
     } catch (e) {
