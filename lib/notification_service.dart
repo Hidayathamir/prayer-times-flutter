@@ -102,31 +102,39 @@ class NotificationService {
     String prayerName,
     DateTime prayerTime,
   ) async {
-    // 1. Calculate 15 minutes before
+    final now = DateTime.now();
     final reminderTime = prayerTime.subtract(const Duration(minutes: 15));
 
-    // 2. Safety Check: If time has already passed, don't schedule
-    if (reminderTime.isBefore(DateTime.now())) {
-      debugPrint("Skipping $prayerName - reminder time $reminderTime already passed");
+    // Case 3: Prayer time itself already passed → skip entirely
+    if (prayerTime.isBefore(now)) {
+      debugPrint("Skipping $prayerName - prayer time ${DateFormat.Hm().format(prayerTime)} already passed");
       return;
     }
 
-    // 3. Convert to "TZDateTime" (Required by the plugin)
+    // Case 2: Prayer is upcoming but 15-min window already passed → notify instantly
+    if (reminderTime.isBefore(now)) {
+      final minutesLeft = prayerTime.difference(now).inMinutes;
+      debugPrint("$prayerName is in $minutesLeft minutes - notifying instantly!");
+      await showInstantNotification(
+        'Prayer Upcoming',
+        '$prayerName is in $minutesLeft minutes! (${DateFormat.Hm().format(prayerTime)})',
+      );
+      return;
+    }
+
+    // Case 1: Both prayer time and reminder time are in the future → schedule normally
     final tz.TZDateTime scheduledDate = tz.TZDateTime.from(
       reminderTime,
       tz.local,
     );
 
-    debugPrint("TZ scheduledDate: $scheduledDate (location: ${scheduledDate.location})");
+    debugPrint("Scheduling $prayerName reminder at ${DateFormat.Hm().format(reminderTime)} "
+        "(prayer at ${DateFormat.Hm().format(prayerTime)})");
 
-    // 4. Define the expandable notification style (Android)
     final BigTextStyleInformation bigTextStyleInformation =
         BigTextStyleInformation(
-          '$prayerName is in 15 minutes. Time to prepare!\n'
-          'Here is a long text to test the expandability feature. '
-          'If you can read this whole sentence, your expandable notification '
-          'is working perfectly on Android!',
-          contentTitle: '<b>$prayerName Warning</b>', // HTML-like styling
+          '$prayerName is in 15 minutes. Time to prepare!',
+          contentTitle: '<b>$prayerName Reminder</b>',
           htmlFormatContentTitle: true,
           summaryText: '$prayerName Soon',
         );
@@ -138,28 +146,32 @@ class NotificationService {
           channelDescription: 'Reminders 15m before prayer',
           importance: Importance.max,
           priority: Priority.high,
-          styleInformation: bigTextStyleInformation, // <--- THIS IS KEY
+          styleInformation: bigTextStyleInformation,
         );
 
     final NotificationDetails details = NotificationDetails(
       android: androidDetails,
     );
 
-    // 5. Schedule it!
     try {
       await _notifications.zonedSchedule(
         id: id,
         title: 'Prayer Upcoming',
-        body:
-            '$prayerName is in 15 minutes (${DateFormat.Hm().format(prayerTime)})',
+        body: '$prayerName is in 15 minutes (${DateFormat.Hm().format(prayerTime)})',
         scheduledDate: scheduledDate,
         notificationDetails: details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       );
-      debugPrint("Scheduled $prayerName reminder for $reminderTime");
+      debugPrint("Scheduled $prayerName reminder for ${DateFormat.Hm().format(reminderTime)}");
     } catch (e, stackTrace) {
       debugPrint("ERROR scheduling $prayerName: $e");
       debugPrint("Stack trace: $stackTrace");
     }
+  }
+
+  // Cancel all scheduled notifications
+  static Future<void> cancelAll() async {
+    await _notifications.cancelAll();
+    debugPrint("All scheduled notifications cancelled");
   }
 }
