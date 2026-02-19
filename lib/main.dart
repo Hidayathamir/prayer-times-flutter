@@ -11,6 +11,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz2;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'notification_service.dart';
+import 'prayer_data_service.dart';
 
 // ── Color Palette ──────────────────────────────────────────────────────
 class AppColors {
@@ -48,6 +49,7 @@ void main() async {
   tz.initializeTimeZones();
   tz2.setLocalLocation(tz2.getLocation('Asia/Jakarta'));
   await NotificationService.init();
+  await PrayerDataService.loadAll();
   runApp(PrayerApp());
 }
 
@@ -283,11 +285,26 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
   Future<void> _scheduleNotifications() async {
     if (prayerTimes == null) return;
     await NotificationService.cancelAll();
-    await NotificationService.schedulePrayerReminder(1, 'Fajr', prayerTimes!.fajr);
-    await NotificationService.schedulePrayerReminder(2, 'Dhuhr', prayerTimes!.dhuhr);
-    await NotificationService.schedulePrayerReminder(3, 'Asr', prayerTimes!.asr);
-    await NotificationService.schedulePrayerReminder(4, 'Maghrib', prayerTimes!.maghrib);
-    await NotificationService.schedulePrayerReminder(5, 'Isha', prayerTimes!.isha);
+
+    final prayers = {
+      'Fajr': prayerTimes!.fajr,
+      'Dhuhr': prayerTimes!.dhuhr,
+      'Asr': prayerTimes!.asr,
+      'Maghrib': prayerTimes!.maghrib,
+      'Isha': prayerTimes!.isha,
+    };
+
+    int id = 1;
+    for (final entry in prayers.entries) {
+      final msg = PrayerDataService.getMessageForToday(entry.key);
+      await NotificationService.schedulePrayerReminder(
+        id++,
+        entry.key,
+        entry.value,
+        notifTitle: msg?.title,
+        notifBody: msg?.body,
+      );
+    }
   }
 
   void _showError(String msg) {

@@ -100,8 +100,10 @@ class NotificationService {
   static Future<void> schedulePrayerReminder(
     int id,
     String prayerName,
-    DateTime prayerTime,
-  ) async {
+    DateTime prayerTime, {
+    String? notifTitle,
+    String? notifBody,
+  }) async {
     final now = DateTime.now();
     final reminderTime = prayerTime.subtract(const Duration(minutes: 15));
 
@@ -116,8 +118,8 @@ class NotificationService {
       final minutesLeft = prayerTime.difference(now).inMinutes;
       debugPrint("$prayerName is in $minutesLeft minutes - notifying instantly!");
       await showInstantNotification(
-        'Prayer Upcoming',
-        '$prayerName is in $minutesLeft minutes! (${DateFormat.Hm().format(prayerTime)})',
+        notifTitle ?? 'Prayer Upcoming',
+        notifBody ?? '$prayerName is in $minutesLeft minutes! (${DateFormat.Hm().format(prayerTime)})',
       );
       return;
     }
@@ -133,8 +135,8 @@ class NotificationService {
 
     final BigTextStyleInformation bigTextStyleInformation =
         BigTextStyleInformation(
-          '$prayerName is in 15 minutes. Time to prepare!',
-          contentTitle: '<b>$prayerName Reminder</b>',
+          notifBody ?? '$prayerName is in 15 minutes. Time to prepare!',
+          contentTitle: '<b>${notifTitle ?? '$prayerName Reminder'}</b>',
           htmlFormatContentTitle: true,
           summaryText: '$prayerName Soon',
         );
@@ -156,8 +158,8 @@ class NotificationService {
     try {
       await _notifications.zonedSchedule(
         id: id,
-        title: 'Prayer Upcoming',
-        body: '$prayerName is in 15 minutes (${DateFormat.Hm().format(prayerTime)})',
+        title: notifTitle ?? 'Prayer Upcoming',
+        body: notifBody ?? '$prayerName is in 15 minutes (${DateFormat.Hm().format(prayerTime)})',
         scheduledDate: scheduledDate,
         notificationDetails: details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
