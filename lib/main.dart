@@ -12,6 +12,7 @@ import 'package:timezone/timezone.dart' as tz2;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'notification_service.dart';
 import 'prayer_data_service.dart';
+import 'app_config.dart';
 
 // ── Color Palette ──────────────────────────────────────────────────────
 class AppColors {
@@ -355,10 +356,89 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
           ),
         ),
       ),
+      floatingActionButton: AppConfig.devMode ? _buildDebugFab() : null,
     );
   }
 
   // ── Header ────────────────────────────────────────────────────────────
+  // ── Debug FAB ─────────────────────────────────────────────────────────
+  Widget _buildDebugFab() {
+    return FloatingActionButton(
+      backgroundColor: Colors.orange.shade700,
+      mini: true,
+      tooltip: 'Preview notifications (DEV)',
+      onPressed: _showDebugSheet,
+      child: const Icon(Icons.bug_report, size: 20),
+    );
+  }
+
+  void _showDebugSheet() {
+    final prayerKeys = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+    final prayerLabels = ['Subuh', 'Dzuhur', 'Ashar', 'Maghrib', 'Isya'];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  '🔔 Preview Notification',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              ...List.generate(prayerKeys.length, (i) {
+                final msg = PrayerDataService.getMessageForToday(prayerKeys[i]);
+                return ListTile(
+                  leading: Icon(Icons.notifications_active, color: Colors.orange.shade400, size: 22),
+                  title: Text(
+                    prayerLabels[i],
+                    style: GoogleFonts.poppins(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  subtitle: Text(
+                    msg?.title ?? '(no data)',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _previewNotification(prayerKeys[i], prayerLabels[i]);
+                  },
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _previewNotification(String prayerKey, String label) async {
+    final msg = PrayerDataService.getMessageForToday(prayerKey);
+    await NotificationService.showInstantNotification(
+      msg?.title ?? '$label Reminder',
+      msg?.body ?? '$label is coming up soon!',
+    );
+  }
   Widget _buildHeader() {
     final nextPrayer = _getNextPrayer();
     final now = DateTime.now();
