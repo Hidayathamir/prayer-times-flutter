@@ -63,9 +63,7 @@ class PrayerApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: AppColors.surface,
-        textTheme: GoogleFonts.poppinsTextTheme(
-          ThemeData.dark().textTheme,
-        ),
+        textTheme: GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme),
         colorScheme: ColorScheme.dark(
           primary: AppColors.primaryLight,
           secondary: AppColors.accent,
@@ -157,9 +155,10 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
       '?q=$query&format=json&featuretype=city&limit=5',
     );
     try {
-      final response = await http.get(url, headers: {
-        'User-Agent': 'FlutterPrayerApp/1.0',
-      });
+      final response = await http.get(
+        url,
+        headers: {'User-Agent': 'FlutterPrayerApp/1.0'},
+      );
       if (response.statusCode == 200) {
         final List data = json.decode(response.body);
         if (!mounted) return;
@@ -243,8 +242,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
       );
       final cityName = placemarks.isNotEmpty
           ? (placemarks.first.locality ??
-              placemarks.first.subAdministrativeArea ??
-              'Unknown')
+                placemarks.first.subAdministrativeArea ??
+                'Unknown')
           : 'Unknown';
 
       _cityController.text = cityName;
@@ -402,7 +401,11 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
               ...List.generate(prayerKeys.length, (i) {
                 final msg = PrayerDataService.getMessageForToday(prayerKeys[i]);
                 return ListTile(
-                  leading: Icon(Icons.notifications_active, color: Colors.orange.shade400, size: 22),
+                  leading: Icon(
+                    Icons.notifications_active,
+                    color: Colors.orange.shade400,
+                    size: 22,
+                  ),
                   title: Text(
                     prayerLabels[i],
                     style: GoogleFonts.poppins(
@@ -439,6 +442,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
       msg?.body ?? '$label is coming up soon!',
     );
   }
+
   Widget _buildHeader() {
     final nextPrayer = _getNextPrayer();
     final now = DateTime.now();
@@ -451,11 +455,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF0F3D3E),
-            Color(0xFF0A2A4A),
-            Color(0xFF102040),
-          ],
+          colors: [Color(0xFF0F3D3E), Color(0xFF0A2A4A), Color(0xFF102040)],
         ),
       ),
       child: Column(
@@ -547,13 +547,18 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.accent,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      _formatCountdown(nextPrayer.time.difference(DateTime.now())),
+                      _formatCountdown(
+                        nextPrayer.time.difference(DateTime.now()),
+                      ),
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -601,10 +606,18 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                     color: AppColors.textSecondary.withOpacity(0.6),
                     fontSize: 14,
                   ),
-                  prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary, size: 20),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: AppColors.textSecondary,
+                    size: 20,
+                  ),
                   suffixIcon: _cityController.text.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, color: AppColors.textSecondary, size: 18),
+                          icon: const Icon(
+                            Icons.clear,
+                            color: AppColors.textSecondary,
+                            size: 18,
+                          ),
                           onPressed: () {
                             _cityController.clear();
                             setState(() => _suggestions = []);
@@ -612,7 +625,10 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                         )
                       : null,
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                 ),
                 onChanged: _onTextChanged,
                 onSubmitted: _onSubmitted,
@@ -634,7 +650,11 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
             ),
             child: IconButton(
               tooltip: 'Use my location',
-              icon: const Icon(Icons.my_location, color: Colors.white, size: 22),
+              icon: const Icon(
+                Icons.my_location,
+                color: Colors.white,
+                size: 22,
+              ),
               onPressed: _useGPS,
             ),
           ),
@@ -670,7 +690,9 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
           final city = _suggestions[index];
           final parts = city['name'].toString().split(',');
           final title = parts[0].trim();
-          final subtitle = parts.length > 1 ? parts.sublist(1).join(',').trim() : '';
+          final subtitle = parts.length > 1
+              ? parts.sublist(1).join(',').trim()
+              : '';
 
           return ListTile(
             dense: true,
@@ -818,8 +840,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                 color: prayer.isNext
                     ? AppColors.accent
                     : isPast
-                        ? AppColors.textSecondary.withOpacity(0.4)
-                        : AppColors.textSecondary,
+                    ? AppColors.textSecondary.withOpacity(0.4)
+                    : AppColors.textSecondary,
                 size: 24,
               ),
             ),
@@ -834,7 +856,9 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                     prayer.name,
                     style: GoogleFonts.poppins(
                       fontSize: 16,
-                      fontWeight: prayer.isNext ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: prayer.isNext
+                          ? FontWeight.w700
+                          : FontWeight.w500,
                       color: isPast
                           ? AppColors.textSecondary.withOpacity(0.4)
                           : AppColors.textPrimary,
@@ -846,7 +870,9 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                       fontSize: 12,
                       color: prayer.isNext
                           ? AppColors.accent.withOpacity(0.7)
-                          : AppColors.textSecondary.withOpacity(isPast ? 0.3 : 0.6),
+                          : AppColors.textSecondary.withOpacity(
+                              isPast ? 0.3 : 0.6,
+                            ),
                     ),
                   ),
                 ],
@@ -865,8 +891,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                     color: prayer.isNext
                         ? AppColors.accent
                         : isPast
-                            ? AppColors.textSecondary.withOpacity(0.4)
-                            : AppColors.textPrimary,
+                        ? AppColors.textSecondary.withOpacity(0.4)
+                        : AppColors.textPrimary,
                   ),
                 ),
                 if (prayer.isNext)
@@ -899,11 +925,36 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     if (prayerTimes == null) return [];
     final now = DateTime.now();
     final prayers = [
-      PrayerInfo(name: 'Fajr', arabicName: 'الفجر', icon: Icons.nights_stay_rounded, time: prayerTimes!.fajr),
-      PrayerInfo(name: 'Dhuhr', arabicName: 'الظهر', icon: Icons.wb_sunny_rounded, time: prayerTimes!.dhuhr),
-      PrayerInfo(name: 'Asr', arabicName: 'العصر', icon: Icons.wb_twilight_rounded, time: prayerTimes!.asr),
-      PrayerInfo(name: 'Maghrib', arabicName: 'المغرب', icon: Icons.nightlight_round, time: prayerTimes!.maghrib),
-      PrayerInfo(name: 'Isha', arabicName: 'العشاء', icon: Icons.dark_mode_rounded, time: prayerTimes!.isha),
+      PrayerInfo(
+        name: 'Fajr',
+        arabicName: 'الفجر',
+        icon: Icons.nights_stay_rounded,
+        time: prayerTimes!.fajr,
+      ),
+      PrayerInfo(
+        name: 'Dhuhr',
+        arabicName: 'الظهر',
+        icon: Icons.wb_sunny_rounded,
+        time: prayerTimes!.dhuhr,
+      ),
+      PrayerInfo(
+        name: 'Asr',
+        arabicName: 'العصر',
+        icon: Icons.wb_twilight_rounded,
+        time: prayerTimes!.asr,
+      ),
+      PrayerInfo(
+        name: 'Maghrib',
+        arabicName: 'المغرب',
+        icon: Icons.nightlight_round,
+        time: prayerTimes!.maghrib,
+      ),
+      PrayerInfo(
+        name: 'Isha',
+        arabicName: 'العشاء',
+        icon: Icons.dark_mode_rounded,
+        time: prayerTimes!.isha,
+      ),
     ];
     int nextIndex = prayers.indexWhere((p) => p.time.isAfter(now));
     return prayers.asMap().entries.map((entry) {
