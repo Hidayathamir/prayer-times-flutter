@@ -44,6 +44,7 @@ dependencies:
   http: ^1.6.0
   google_fonts: ^6.2.1
   shared_preferences: ^2.5.3
+  hijri: ^3.0.0
 
 dev_dependencies:
   flutter_test:

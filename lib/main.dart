@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:hijri/hijri_calendar.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz2;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -442,8 +443,28 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
 
   Widget _buildHeader() {
     final nextPrayer = _getNextPrayer();
+    
+    DateTime effectiveNow = DateTime.now();
+    // In Islam, the new day starts after Maghrib
+    if (prayerTimes != null && effectiveNow.isAfter(prayerTimes!.maghrib)) {
+      effectiveNow = effectiveNow.add(const Duration(days: 1));
+    }
+    
     final now = DateTime.now();
     final dateStr = DateFormat('EEEE, d MMMM yyyy').format(now);
+    
+    HijriCalendar.setLocal('en');
+    // Adjust -1 day for Indonesian Hijri calendar
+    final adjustedDate = effectiveNow.subtract(const Duration(days: 1));
+    final hDate = HijriCalendar.fromDate(adjustedDate);
+    String hijriStr = '${hDate.hDay} ${hDate.longMonthName} ${hDate.hYear} AH';
+    if (hDate.hMonth == 9) { // 9 is Ramadhan
+      if (effectiveNow.day != now.day) {
+        hijriStr = 'Tonight is Ramadhan Day ${hDate.hDay}';
+      } else {
+        hijriStr = 'Ramadhan Day ${hDate.hDay}';
+      }
+    }
 
     return Container(
       width: double.infinity,
@@ -482,6 +503,15 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
             style: GoogleFonts.poppins(
               fontSize: 13,
               color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            hijriStr,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.accent,
             ),
           ),
 
