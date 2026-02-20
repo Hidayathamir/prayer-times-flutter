@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
@@ -44,15 +45,35 @@ class NotificationService {
     }
   }
 
-  // 3. Simple Instant Notification (for testing)
-  static Future<void> showInstantNotification(String title, String body) async {
-    const NotificationDetails details = NotificationDetails(
+  // Helper for consistent alarm notification details
+  static NotificationDetails _getAlarmNotificationDetails({
+    required String channelId,
+    required String channelName,
+    String? channelDescription,
+    BigTextStyleInformation? styleInformation,
+  }) {
+    return NotificationDetails(
       android: AndroidNotificationDetails(
-        'channel_id_1',
-        'High Importance Notifications',
+        channelId,
+        channelName,
+        channelDescription: channelDescription,
         importance: Importance.max,
         priority: Priority.high,
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+        category: AndroidNotificationCategory.alarm,
+        sound: const RawResourceAndroidNotificationSound('alarm'),
+        additionalFlags: Int32List.fromList(<int>[4]), // FLAG_INSISTENT
+        fullScreenIntent: true,
+        styleInformation: styleInformation,
       ),
+    );
+  }
+
+  // 3. Simple Instant Notification (for testing)
+  static Future<void> showInstantNotification(String title, String body) async {
+    final NotificationDetails details = _getAlarmNotificationDetails(
+      channelId: 'channel_id_alarm_2',
+      channelName: 'High Importance Alarms',
     );
 
     await _notifications.show(
@@ -71,14 +92,10 @@ class NotificationService {
     debugPrint("TZ now: ${tz.TZDateTime.now(tz.local)}");
     debugPrint("Scheduling direct test for: $scheduledTime");
 
-    final NotificationDetails details = const NotificationDetails(
-      android: AndroidNotificationDetails(
-        'prayer_channel',
-        'Prayer Reminders',
-        channelDescription: 'Reminders 15m before prayer',
-        importance: Importance.max,
-        priority: Priority.high,
-      ),
+    final NotificationDetails details = _getAlarmNotificationDetails(
+      channelId: 'prayer_channel_alarm_2',
+      channelName: 'Prayer Alarms',
+      channelDescription: 'Alarm reminders 15m before prayer',
     );
 
     try {
@@ -141,18 +158,11 @@ class NotificationService {
           summaryText: '$prayerName Soon',
         );
 
-    final AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-          'prayer_channel',
-          'Prayer Reminders',
-          channelDescription: 'Reminders 15m before prayer',
-          importance: Importance.max,
-          priority: Priority.high,
-          styleInformation: bigTextStyleInformation,
-        );
-
-    final NotificationDetails details = NotificationDetails(
-      android: androidDetails,
+    final NotificationDetails details = _getAlarmNotificationDetails(
+      channelId: 'prayer_channel_alarm_2',
+      channelName: 'Prayer Alarms',
+      channelDescription: 'Alarm reminders 15m before prayer',
+      styleInformation: bigTextStyleInformation,
     );
 
     try {
