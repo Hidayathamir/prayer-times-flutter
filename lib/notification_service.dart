@@ -2,34 +2,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'app_config.dart';
+import 'settings_service.dart';
 
 class NotificationService {
   // 1. Create the plugin instance
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
-  // Helper to format snooze duration into readable text
+  // Helper to format snooze duration into readable text (delegates to SettingsService)
   static String _formatSnoozeDuration(int seconds) {
-    if (seconds < 60) {
-      return '$seconds second${seconds == 1 ? '' : 's'}';
-    } else if (seconds < 3600) {
-      final minutes = seconds ~/ 60;
-      final remainingSeconds = seconds % 60;
-      if (remainingSeconds == 0) {
-        return '$minutes minute${minutes == 1 ? '' : 's'}';
-      } else {
-        return '$minutes minute${minutes == 1 ? '' : 's'} $remainingSeconds second${remainingSeconds == 1 ? '' : 's'}';
-      }
-    } else {
-      final hours = seconds ~/ 3600;
-      final remainingMinutes = (seconds % 3600) ~/ 60;
-      if (remainingMinutes == 0) {
-        return '$hours hour${hours == 1 ? '' : 's'}';
-      } else {
-        return '$hours hour${hours == 1 ? '' : 's'} $remainingMinutes minute${remainingMinutes == 1 ? '' : 's'}';
-      }
-    }
+    return SettingsService.formatSnoozeDuration(seconds);
   }
 
   // 2. Initialize settings for Android, iOS, and Linux
@@ -87,11 +69,12 @@ class NotificationService {
       debugPrint('=== SNOOZE ACTION TRIGGERED ===');
       debugPrint('Payload: $payload');
       
+      final snoozeSeconds = SettingsService.snoozeDurationSeconds;
       final newTime = DateTime.now().add(
-        Duration(seconds: AppConfig.snoozeDurationSeconds)
+        Duration(seconds: snoozeSeconds)
       );
       
-      debugPrint('Scheduling snooze for ${AppConfig.snoozeDurationSeconds} seconds');
+      debugPrint('Scheduling snooze for $snoozeSeconds seconds');
       _scheduleBackupSnooze(payload, newTime);
     } catch (e) {
       debugPrint("Error handling snooze action: $e");
@@ -108,11 +91,13 @@ class NotificationService {
     debugPrint('Scheduled date: $scheduledDate');
     debugPrint('Local timezone: ${tz.local}');
 
+    final snoozeSeconds = SettingsService.snoozeDurationSeconds;
+
     // Create custom notification details with vibration for snooze
     final NotificationDetails details = _getAlarmNotificationDetails(
       channelId: 'prayer_channel_alarm_2', // Use same channel as main notifications
       channelName: 'Prayer Alarms',
-      channelDescription: 'Alarm reminders 15m before prayer',
+      channelDescription: 'Alarm reminders before prayer',
       styleInformation: null, // Use default style for snooze notifications
       enableSnooze: true, // Enable snooze for snooze notifications too
     );
@@ -121,7 +106,7 @@ class NotificationService {
       await _notifications.zonedSchedule(
         id: prayerName.hashCode + 1000, // Different ID to avoid conflicts
         title: 'Reminder: $prayerName',
-        body: 'This is your ${_formatSnoozeDuration(AppConfig.snoozeDurationSeconds)} reminder for $prayerName.',
+        body: 'This is your ${_formatSnoozeDuration(snoozeSeconds)} reminder for $prayerName.',
         scheduledDate: scheduledDate,
         notificationDetails: details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -142,7 +127,8 @@ class NotificationService {
     BigTextStyleInformation? styleInformation,
     bool enableSnooze = true,
   }) {
-    final snoozeText = 'Remind me in ${_formatSnoozeDuration(AppConfig.snoozeDurationSeconds)}';
+    final snoozeSeconds = SettingsService.snoozeDurationSeconds;
+    final snoozeText = 'Remind me in ${_formatSnoozeDuration(snoozeSeconds)}';
     
     final androidDetails = AndroidNotificationDetails(
       channelId,
@@ -265,7 +251,7 @@ class NotificationService {
     final NotificationDetails details = _getAlarmNotificationDetails(
       channelId: 'prayer_channel_alarm_2',
       channelName: 'Prayer Alarms',
-      channelDescription: 'Alarm reminders 15m before prayer',
+      channelDescription: 'Alarm reminders before prayer',
     );
 
     try {
@@ -292,7 +278,8 @@ class NotificationService {
     String? notifBody,
   }) async {
     final now = DateTime.now();
-    final reminderTime = prayerTime.subtract(const Duration(minutes: 15));
+    final minutesBefore = SettingsService.notificationMinutesBefore;
+    final reminderTime = prayerTime.subtract(Duration(minutes: minutesBefore));
 
     // Case 3: Prayer time itself already passed → skip entirely
     if (prayerTime.isBefore(now)) {
@@ -300,7 +287,7 @@ class NotificationService {
       return;
     }
 
-    // Case 2: Prayer is upcoming but 15-min window already passed → notify instantly
+    // Case 2: Prayer is upcoming but reminder window already passed → notify instantly
     if (reminderTime.isBefore(now)) {
       final minutesLeft = prayerTime.difference(now).inMinutes;
       debugPrint("$prayerName is in $minutesLeft minutes - notifying instantly!");
@@ -323,7 +310,7 @@ class NotificationService {
       id: id,
       prayerName: prayerName,
       title: notifTitle ?? 'Prayer Upcoming',
-      body: notifBody ?? '$prayerName is in 15 minutes (${DateFormat.Hm().format(prayerTime)})',
+      body: notifBody ?? '$prayerName is in $minutesBefore minutes (${DateFormat.Hm().format(prayerTime)})',
       scheduledTime: reminderTime,
       isInstant: false,
     );

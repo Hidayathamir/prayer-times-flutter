@@ -14,20 +14,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'notification_service.dart';
 import 'prayer_data_service.dart';
 import 'app_config.dart';
+import 'settings_service.dart';
+import 'settings_screen.dart';
+import 'app_colors.dart';
 
-// ── Color Palette ──────────────────────────────────────────────────────
-class AppColors {
-  static const Color primary = Color(0xFF0D4F4F);
-  static const Color primaryLight = Color(0xFF1A7A7A);
-  static const Color accent = Color(0xFFE8B931);
-  static const Color accentGlow = Color(0x40E8B931);
-  static const Color surface = Color(0xFF0A1A2E);
-  static const Color surfaceLight = Color(0xFF132742);
-  static const Color cardBg = Color(0xFF15304D);
-  static const Color textPrimary = Color(0xFFF0F0F0);
-  static const Color textSecondary = Color(0xFFAABBCC);
-  static const Color searchBg = Color(0xFF1C3A5C);
-}
 
 // ── Prayer Data Model ──────────────────────────────────────────────────
 class PrayerInfo {
@@ -50,6 +40,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   tz.initializeTimeZones();
   tz2.setLocalLocation(tz2.getLocation('Asia/Jakarta'));
+  await SettingsService.init();
   await NotificationService.init();
   await PrayerDataService.loadAll();
   runApp(PrayerApp());
@@ -485,7 +476,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top row: title + crescent
+          // Top row: title + settings + crescent
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -497,7 +488,30 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                   color: AppColors.textPrimary,
                 ),
               ),
-              const Text('☪', style: TextStyle(fontSize: 28)),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.settings_outlined, color: AppColors.textSecondary, size: 22),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SettingsScreen(
+                            onSettingsChanged: () {
+                              // Reschedule notifications with new settings
+                              _scheduleNotifications();
+                              setState(() {});
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                    tooltip: 'Settings',
+                  ),
+                  const Text('☪', style: TextStyle(fontSize: 28)),
+                ],
+              ),
             ],
           ),
 
