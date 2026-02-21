@@ -435,10 +435,26 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
 
   Future<void> _previewNotification(String prayerKey, String label) async {
     final msg = PrayerDataService.getMessageForToday(prayerKey);
-    await NotificationService.showInstantNotification(
-      msg?.title ?? '$label Reminder',
-      msg?.body ?? '$label is coming up soon!',
+    await NotificationService.showPrayerNotification(
+      id: 100 + _getPrayerIndex(prayerKey), // Use unique IDs to avoid conflicts
+      prayerName: label,
+      title: msg?.title ?? '$label Reminder',
+      body: msg?.body ?? '$label is coming up soon!',
+      isInstant: true,
+      enableSnooze: true, // Enable snooze for debug notifications too
     );
+  }
+
+  // Helper to get prayer index for unique IDs
+  int _getPrayerIndex(String prayerKey) {
+    switch (prayerKey) {
+      case 'Fajr': return 0;
+      case 'Dhuhr': return 1;
+      case 'Asr': return 2;
+      case 'Maghrib': return 3;
+      case 'Isha': return 4;
+      default: return 0;
+    }
   }
 
   Widget _buildHeader() {
