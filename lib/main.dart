@@ -138,17 +138,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
   }
 
   // ── Search ───────────────────────────────────────────────────────────
-  void _onTextChanged(String text) {
-    _debounce?.cancel();
-    if (text.trim().length < 3) {
-      setState(() => _suggestions = []);
-      return;
-    }
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      _fetchCities(text.trim());
-    });
-  }
-
   Future<void> _fetchCities(String query) async {
     final url = Uri.parse(
       'https://nominatim.openstreetmap.org/search'
@@ -346,7 +335,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
           child: Column(
             children: [
               _buildHeader(),
-              _buildSearchBar(),
               if (_suggestions.isNotEmpty) _buildSuggestions(),
               Expanded(child: _buildBody()),
             ],
@@ -531,24 +519,53 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
             ),
           ),
 
-          // City
-          if (selectedCityName != null) ...[
-            const SizedBox(height: 2),
-            Row(
-              children: [
-                Icon(Icons.location_on, size: 14, color: AppColors.accent),
-                const SizedBox(width: 4),
-                Text(
-                  selectedCityName!,
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    color: AppColors.accent,
-                    fontWeight: FontWeight.w500,
-                  ),
+          // Location chip - compact and tappable
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: _showLocationPicker,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: selectedCityName != null
+                    ? AppColors.accent.withOpacity(0.15)
+                    : AppColors.primaryLight.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: selectedCityName != null
+                      ? AppColors.accent.withOpacity(0.3)
+                      : AppColors.primaryLight.withOpacity(0.5),
+                  width: 1,
                 ),
-              ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    selectedCityName != null ? Icons.location_on : Icons.add_location,
+                    size: 14,
+                    color: selectedCityName != null ? AppColors.accent : AppColors.primaryLight,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    selectedCityName ?? 'Set Location',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: selectedCityName != null ? AppColors.accent : AppColors.primaryLight,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.edit,
+                    size: 12,
+                    color: selectedCityName != null
+                        ? AppColors.accent.withOpacity(0.7)
+                        : AppColors.primaryLight.withOpacity(0.7),
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
 
           // Next prayer countdown
           if (nextPrayer != null) ...[
@@ -618,98 +635,217 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     );
   }
 
-  // ── Search Bar ────────────────────────────────────────────────────────
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.searchBg,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: TextField(
-                controller: _cityController,
-                style: GoogleFonts.poppins(
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Search city...',
-                  hintStyle: GoogleFonts.poppins(
-                    color: AppColors.textSecondary.withOpacity(0.6),
-                    fontSize: 14,
-                  ),
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    color: AppColors.textSecondary,
-                    size: 20,
-                  ),
-                  suffixIcon: _cityController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(
-                            Icons.clear,
-                            color: AppColors.textSecondary,
-                            size: 18,
-                          ),
-                          onPressed: () {
-                            _cityController.clear();
-                            setState(() => _suggestions = []);
-                          },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                ),
-                onChanged: _onTextChanged,
-                onSubmitted: _onSubmitted,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.primaryLight,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primaryLight.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: IconButton(
-              tooltip: 'Use my location',
-              icon: const Icon(
-                Icons.my_location,
-                color: Colors.white,
-                size: 22,
-              ),
-              onPressed: _useGPS,
-            ),
-          ),
-        ],
+  // ── Location Picker Bottom Sheet ──────────────────────────────────────
+  void _showLocationPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-    );
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Handle bar
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.textSecondary.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Title
+                    Text(
+                      'Select Location',
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Search for a city or use your current location',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Search field
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.searchBg,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: TextField(
+                        controller: _cityController,
+                        style: GoogleFonts.poppins(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Search city...',
+                          hintStyle: GoogleFonts.poppins(
+                            color: AppColors.textSecondary.withOpacity(0.6),
+                            fontSize: 14,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            color: AppColors.textSecondary,
+                            size: 20,
+                          ),
+                          suffixIcon: _cityController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(
+                                    Icons.clear,
+                                    color: AppColors.textSecondary,
+                                    size: 18,
+                                  ),
+                                  onPressed: () {
+                                    _cityController.clear();
+                                    setModalState(() => _suggestions = []);
+                                  },
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                        ),
+                        onChanged: (text) {
+                          _debounce?.cancel();
+                          if (text.trim().length < 3) {
+                            setModalState(() => _suggestions = []);
+                            return;
+                          }
+                          _debounce = Timer(const Duration(milliseconds: 500), () {
+                            _fetchCities(text.trim()).then((_) {
+                              if (mounted) setModalState(() {});
+                            });
+                          });
+                        },
+                        onSubmitted: (text) async {
+                          if (text.trim().isEmpty) return;
+                          Navigator.pop(ctx);
+                          await _onSubmitted(text);
+                        },
+                      ),
+                    ),
+                    // Suggestions inside bottom sheet
+                    if (_suggestions.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        constraints: const BoxConstraints(maxHeight: 200),
+                        decoration: BoxDecoration(
+                          color: AppColors.cardBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.searchBg, width: 1),
+                        ),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          itemCount: _suggestions.length,
+                          separatorBuilder: (_, __) =>
+                              Divider(height: 1, color: AppColors.searchBg, indent: 48),
+                          itemBuilder: (context, index) {
+                            final city = _suggestions[index];
+                            final parts = city['name'].toString().split(',');
+                            final title = parts[0].trim();
+                            final subtitle = parts.length > 1
+                                ? parts.sublist(1).join(',').trim()
+                                : '';
+
+                            return ListTile(
+                              dense: true,
+                              leading: Icon(Icons.location_on, color: AppColors.accent, size: 18),
+                              title: Text(
+                                title,
+                                style: GoogleFonts.poppins(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              subtitle: subtitle.isNotEmpty
+                                  ? Text(
+                                      subtitle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 11,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    )
+                                  : null,
+                              onTap: () {
+                                _onCitySelected(city);
+                                Navigator.pop(ctx);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                    // GPS button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _useGPS();
+                        },
+                        icon: const Icon(Icons.my_location, size: 18),
+                        label: Text(
+                          'Use Current Location',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryLight,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      _cityController.clear();
+      setState(() => _suggestions = []);
+    });
   }
 
-  // ── Suggestions Dropdown ──────────────────────────────────────────────
+  // ── Suggestions Dropdown (legacy - kept for reference but now inside bottom sheet) ──────────────────────────────────────────────
   Widget _buildSuggestions() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 68, 0),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       constraints: const BoxConstraints(maxHeight: 200),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
@@ -806,10 +942,29 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'Search for a city or use GPS',
+            'Set your location to see prayer times',
             style: GoogleFonts.poppins(
               fontSize: 14,
               color: AppColors.textSecondary.withOpacity(0.5),
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _showLocationPicker,
+            icon: const Icon(Icons.location_on),
+            label: Text(
+              'Set Location',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryLight,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],
