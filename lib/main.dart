@@ -368,11 +368,12 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
@@ -414,7 +415,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                   },
                 );
               }),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -647,10 +649,10 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final bottomPadding = MediaQuery.of(context).viewInsets.bottom +
+                MediaQuery.of(context).viewPadding.bottom;
             return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
+              padding: EdgeInsets.only(bottom: bottomPadding),
               child: Container(
                 padding: const EdgeInsets.all(20),
                 child: Column(
