@@ -9,6 +9,9 @@ class NotificationService {
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
+  // Cache for whether exact alarms are currently allowed (Android-specific)
+  static bool? _canScheduleExactAlarms;
+
   // Helper to format snooze duration into readable text (delegates to SettingsService)
   static String _formatSnoozeDuration(int seconds) {
     return SettingsService.formatSnoozeDuration(seconds);
@@ -44,14 +47,31 @@ class NotificationService {
       await androidPlugin.requestNotificationsPermission();
 
       // Check and request exact alarm permission (required on Android 14+)
-      final canSchedule = await androidPlugin.canScheduleExactNotifications();
-      debugPrint("Can schedule exact alarms: $canSchedule");
+      var canSchedule = await androidPlugin.canScheduleExactNotifications();
+      debugPrint("[NotificationService] Initial canScheduleExactAlarms: $canSchedule");
       if (canSchedule != true) {
-        debugPrint("Exact alarm permission NOT granted! Requesting...");
+        debugPrint("[NotificationService] Exact alarm permission NOT granted, requesting system permission...");
         await androidPlugin.requestExactAlarmsPermission();
+
+        // Re-check after requesting so the app can react appropriately
+        canSchedule = await androidPlugin.canScheduleExactNotifications();
+        debugPrint("[NotificationService] canScheduleExactAlarms after request: $canSchedule");
+
+        if (canSchedule != true) {
+          debugPrint(
+            "[NotificationService] WARNING: Exact alarms are still NOT allowed by the system. "
+            "15-minute-before reminders may not fire reliably unless the user enables exact alarms "
+            "and disables aggressive battery optimization for this app.",
+          );
+        }
       }
+
+      _canScheduleExactAlarms = canSchedule == true;
     }
   }
+
+  // Expose whether exact alarms are currently allowed (Android-only; null if unknown)
+  static bool? get canScheduleExactAlarms => _canScheduleExactAlarms;
 
   // Handle notification tap actions
   static void _onNotificationTapped(NotificationResponse response) {
