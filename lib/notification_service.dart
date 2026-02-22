@@ -146,7 +146,7 @@ class NotificationService {
         AndroidNotificationAction(
           'snooze',
           snoozeText,
-          showsUserInterface: true, // Make sure it's clickable
+          showsUserInterface: false,
         ),
       ] : null,
     );
