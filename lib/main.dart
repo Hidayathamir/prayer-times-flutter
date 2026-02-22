@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hijri/hijri_calendar.dart';
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz2;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -36,6 +37,68 @@ class PrayerInfo {
   });
 }
 
+// Shared helper to schedule all prayer notifications for a given PrayerTimes
+Future<void> scheduleAllPrayerNotifications(PrayerTimes prayerTimes) async {
+  await NotificationService.cancelAll();
+
+  final prayers = {
+    'Fajr': prayerTimes.fajr,
+    'Dhuhr': prayerTimes.dhuhr,
+    'Asr': prayerTimes.asr,
+    'Maghrib': prayerTimes.maghrib,
+    'Isha': prayerTimes.isha,
+  };
+
+  int id = 1;
+  for (final entry in prayers.entries) {
+    final msg = PrayerDataService.getMessageForToday(entry.key);
+    await NotificationService.schedulePrayerReminder(
+      id++,
+      entry.key,
+      entry.value,
+      notifTitle: msg?.title,
+      notifBody: msg?.body,
+    );
+  }
+}
+
+// Top-level background task for daily scheduling (Android AlarmManager)
+Future<void> backgroundDailyScheduler() async {
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    tz.initializeTimeZones();
+    
+    // Use dynamic timezone from settings
+    final savedTimezone = SettingsService.timezone;
+    debugPrint('[BackgroundScheduler] Using timezone: $savedTimezone');
+    tz2.setLocalLocation(tz2.getLocation(savedTimezone));
+    
+    await SettingsService.init();
+    await NotificationService.init();
+    await PrayerDataService.loadAll();
+
+    final prefs = await SharedPreferences.getInstance();
+    final lat = prefs.getDouble('city_lat');
+    final lon = prefs.getDouble('city_lon');
+    if (lat == null || lon == null) {
+      debugPrint('[BackgroundScheduler] No saved city coordinates; skipping scheduling.');
+      return;
+    }
+
+    final coords = Coordinates(lat, lon);
+    final params = CalculationMethod.singapore.getParameters();
+    params.madhab = Madhab.shafi;
+    final today = DateComponents.from(DateTime.now());
+    final pt = PrayerTimes(coords, today, params);
+
+    debugPrint('[BackgroundScheduler] Scheduling notifications for today using saved location.');
+    await scheduleAllPrayerNotifications(pt);
+  } catch (e, stackTrace) {
+    debugPrint('[BackgroundScheduler] Error in background scheduler: $e');
+    debugPrint('[BackgroundScheduler] Stack trace: $stackTrace');
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   tz.initializeTimeZones();
@@ -43,6 +106,37 @@ void main() async {
   await SettingsService.init();
   await NotificationService.init();
   await PrayerDataService.loadAll();
+  await AndroidAlarmManager.initialize();
+
+  // Schedule a daily background task to refresh prayer notifications
+  const int dailyAlarmId = 1;
+  final now = DateTime.now();
+  
+  // Use configurable schedule time from settings
+  final scheduleHour = SettingsService.dailyScheduleHour;
+  final scheduleMinute = SettingsService.dailyScheduleMinute;
+  
+  final startAt = DateTime(now.year, now.month, now.day, scheduleHour, scheduleMinute)
+      .add(const Duration(days: 1));
+  
+  debugPrint('[AlarmManager] Scheduling daily alarm for ${SettingsService.dailyScheduleTime}');
+  
+  try {
+    await AndroidAlarmManager.periodic(
+      const Duration(days: 1),
+      dailyAlarmId,
+      backgroundDailyScheduler,
+      startAt: startAt,
+      exact: true,
+      wakeup: true,
+      // rescheduleOnReboot: true, // Disabled to avoid RebootBroadcastReceiver permission errors
+    );
+    debugPrint('[AlarmManager] Daily background alarm scheduled successfully.');
+  } catch (e, stackTrace) {
+    debugPrint('[AlarmManager] Failed to schedule daily background alarm: $e');
+    debugPrint('[AlarmManager] Stack trace: $stackTrace');
+    // Continue launching the app even if alarm scheduling fails
+  }
   runApp(PrayerApp());
 }
 
@@ -240,8 +334,10 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     params.madhab = Madhab.shafi;
     final today = DateComponents.from(DateTime.now());
 
+    final pt = PrayerTimes(coords, today, params);
+
     setState(() {
-      prayerTimes = PrayerTimes(coords, today, params);
+      prayerTimes = pt;
     });
 
     _fadeController.reset();
@@ -262,27 +358,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
 
   Future<void> _scheduleNotifications() async {
     if (prayerTimes == null) return;
-    await NotificationService.cancelAll();
-
-    final prayers = {
-      'Fajr': prayerTimes!.fajr,
-      'Dhuhr': prayerTimes!.dhuhr,
-      'Asr': prayerTimes!.asr,
-      'Maghrib': prayerTimes!.maghrib,
-      'Isha': prayerTimes!.isha,
-    };
-
-    int id = 1;
-    for (final entry in prayers.entries) {
-      final msg = PrayerDataService.getMessageForToday(entry.key);
-      await NotificationService.schedulePrayerReminder(
-        id++,
-        entry.key,
-        entry.value,
-        notifTitle: msg?.title,
-        notifBody: msg?.body,
-      );
-    }
+    await scheduleAllPrayerNotifications(prayerTimes!);
   }
 
   void _showError(String msg) {
