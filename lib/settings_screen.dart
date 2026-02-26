@@ -14,13 +14,13 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late int _notificationMinutes;
-  late int _snoozeSeconds;
+  late int _snoozeMinutes;
 
   @override
   void initState() {
     super.initState();
     _notificationMinutes = SettingsService.notificationMinutesBefore;
-    _snoozeSeconds = SettingsService.snoozeDurationSeconds;
+    _snoozeMinutes = SettingsService.snoozeDurationMinutes;
   }
 
   @override
@@ -47,23 +47,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-          // Notification Time Section
-          _buildSectionHeader('Notification Time'),
-          const SizedBox(height: 8),
-          _buildNotificationTimeCard(),
-          const SizedBox(height: 24),
+            // Alarm Time Section
+            _buildSectionHeader('Alarm Time'),
+            const SizedBox(height: 8),
+            _buildNotificationTimeCard(),
+            const SizedBox(height: 24),
 
-          // Snooze Duration Section
-          _buildSectionHeader('Snooze Duration'),
-          const SizedBox(height: 8),
-          _buildSnoozeDurationCard(),
-          const SizedBox(height: 24),
+            // Snooze Duration Section
+            _buildSectionHeader('Snooze Duration'),
+            const SizedBox(height: 8),
+            _buildSnoozeDurationCard(),
+            const SizedBox(height: 24),
 
-          // Info card
-          _buildInfoCard(),
-        ],
+            // Info card
+            _buildInfoCard(),
+          ],
+        ),
       ),
-    ),
     );
   }
 
@@ -90,7 +90,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           final isSelected = _notificationMinutes == minutes;
           return _buildOptionTile(
             title: SettingsService.formatNotificationTime(minutes),
-            subtitle: 'Notify $minutes minutes before prayer time',
+            subtitle: 'Alarm rings $minutes minutes before prayer time',
             isSelected: isSelected,
             onTap: () => _selectNotificationTime(minutes),
           );
@@ -107,13 +107,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         border: Border.all(color: AppColors.surfaceLight, width: 1),
       ),
       child: Column(
-        children: SettingsService.snoozeDurationOptions.map((seconds) {
-          final isSelected = _snoozeSeconds == seconds;
+        children: SettingsService.snoozeDurationOptions.map((minutes) {
+          final isSelected = _snoozeMinutes == minutes;
           return _buildOptionTile(
-            title: SettingsService.formatSnoozeDuration(seconds),
-            subtitle: 'Snooze reminder after $seconds seconds',
+            title: SettingsService.formatSnoozeDuration(minutes),
+            subtitle: 'Re-rings after $minutes minutes',
             isSelected: isSelected,
-            onTap: () => _selectSnoozeDuration(seconds),
+            onTap: () => _selectSnoozeDuration(minutes),
           );
         }).toList(),
       ),
@@ -194,7 +194,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.info_outline, color: AppColors.primaryLight, size: 20),
+              Icon(Icons.alarm_on, color: AppColors.primaryLight, size: 20),
               const SizedBox(width: 8),
               Text(
                 'How it works',
@@ -208,13 +208,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 12),
           _buildInfoItem(
-            'Notification Time',
-            'You will receive a reminder at the selected time before each prayer.',
+            'Native Alarm',
+            'Uses Android\'s alarm system — rings even if the app is killed or the phone is in silent/vibrate mode.',
           ),
           const SizedBox(height: 8),
           _buildInfoItem(
-            'Snooze Duration',
-            'When you tap "Remind me later" on a notification, you\'ll get another reminder after this duration.',
+            'Alarm Time',
+            'The alarm rings at the selected number of minutes before each prayer time.',
+          ),
+          const SizedBox(height: 8),
+          _buildInfoItem(
+            'Snooze',
+            'When the alarm rings, tap "Snooze" on the alarm screen to delay it by the configured duration.',
+          ),
+          const SizedBox(height: 8),
+          _buildInfoItem(
+            'Battery Optimisation',
+            'For best reliability, allow this app to ignore battery optimisation in your phone\'s settings.',
           ),
         ],
       ),
@@ -247,17 +257,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _selectNotificationTime(int minutes) async {
     if (_notificationMinutes == minutes) return;
-
     setState(() => _notificationMinutes = minutes);
     await SettingsService.setNotificationMinutesBefore(minutes);
     widget.onSettingsChanged?.call();
-
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Notification time set to ${SettingsService.formatNotificationTime(minutes)}',
-          ),
+          content: Text('Alarm set to ${SettingsService.formatNotificationTime(minutes)}'),
           backgroundColor: AppColors.primaryLight,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -266,18 +272,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _selectSnoozeDuration(int seconds) async {
-    if (_snoozeSeconds == seconds) return;
-
-    setState(() => _snoozeSeconds = seconds);
-    await SettingsService.setSnoozeDurationSeconds(seconds);
-
+  void _selectSnoozeDuration(int minutes) async {
+    if (_snoozeMinutes == minutes) return;
+    setState(() => _snoozeMinutes = minutes);
+    await SettingsService.setSnoozeDurationMinutes(minutes);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Snooze duration set to ${SettingsService.formatSnoozeDuration(seconds)}',
-          ),
+          content: Text('Snooze set to ${SettingsService.formatSnoozeDuration(minutes)}'),
           backgroundColor: AppColors.primaryLight,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

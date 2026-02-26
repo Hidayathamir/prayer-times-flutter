@@ -36,8 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   adhan: ^2.0.0+1
   intl: ^0.20.2
-  flutter_local_notifications: ^20.1.0
-  timezone: ^0.10.1
+  alarm: ^5.2.1
   geolocator: ^14.0.2
   permission_handler: ^12.0.1
   geocoding: ^4.0.0
@@ -45,7 +44,6 @@ dependencies:
   google_fonts: ^6.2.1
   shared_preferences: ^2.5.3
   hijri: ^3.0.0
-  android_alarm_manager_plus: ^5.0.0
 
 dev_dependencies:
   flutter_test:
@@ -78,6 +76,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/alarm.wav
     - data/notification-for-pray-subuh-merged.csv
     - data/notification-for-pray-dzuhur-merged.csv
     - data/notification-for-pray-ashar-merged.csv

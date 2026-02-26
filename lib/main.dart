@@ -8,11 +8,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hijri/hijri_calendar.dart';
-import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
-import 'package:timezone/data/latest_all.dart' as tz;
-import 'package:timezone/timezone.dart' as tz2;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'notification_service.dart';
+import 'alarm_service.dart';
+import 'alarm_overlay.dart';
 import 'prayer_data_service.dart';
 import 'app_config.dart';
 import 'settings_service.dart';
@@ -37,106 +35,13 @@ class PrayerInfo {
   });
 }
 
-// Shared helper to schedule all prayer notifications for a given PrayerTimes
-Future<void> scheduleAllPrayerNotifications(PrayerTimes prayerTimes) async {
-  await NotificationService.cancelAll();
 
-  final prayers = {
-    'Fajr': prayerTimes.fajr,
-    'Dhuhr': prayerTimes.dhuhr,
-    'Asr': prayerTimes.asr,
-    'Maghrib': prayerTimes.maghrib,
-    'Isha': prayerTimes.isha,
-  };
-
-  int id = 1;
-  for (final entry in prayers.entries) {
-    final msg = PrayerDataService.getMessageForToday(entry.key);
-    await NotificationService.schedulePrayerReminder(
-      id++,
-      entry.key,
-      entry.value,
-      notifTitle: msg?.title,
-      notifBody: msg?.body,
-    );
-  }
-}
-
-// Top-level background task for daily scheduling (Android AlarmManager)
-Future<void> backgroundDailyScheduler() async {
-  try {
-    WidgetsFlutterBinding.ensureInitialized();
-    tz.initializeTimeZones();
-    
-    // Use dynamic timezone from settings
-    final savedTimezone = SettingsService.timezone;
-    debugPrint('[BackgroundScheduler] Using timezone: $savedTimezone');
-    tz2.setLocalLocation(tz2.getLocation(savedTimezone));
-    
-    await SettingsService.init();
-    await NotificationService.init();
-    await PrayerDataService.loadAll();
-
-    final prefs = await SharedPreferences.getInstance();
-    final lat = prefs.getDouble('city_lat');
-    final lon = prefs.getDouble('city_lon');
-    if (lat == null || lon == null) {
-      debugPrint('[BackgroundScheduler] No saved city coordinates; skipping scheduling.');
-      return;
-    }
-
-    final coords = Coordinates(lat, lon);
-    final params = CalculationMethod.singapore.getParameters();
-    params.madhab = Madhab.shafi;
-    final today = DateComponents.from(DateTime.now());
-    final pt = PrayerTimes(coords, today, params);
-
-    debugPrint('[BackgroundScheduler] Scheduling notifications for today using saved location.');
-    await scheduleAllPrayerNotifications(pt);
-  } catch (e, stackTrace) {
-    debugPrint('[BackgroundScheduler] Error in background scheduler: $e');
-    debugPrint('[BackgroundScheduler] Stack trace: $stackTrace');
-  }
-}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  tz.initializeTimeZones();
-  tz2.setLocalLocation(tz2.getLocation('Asia/Jakarta'));
   await SettingsService.init();
-  await NotificationService.init();
+  await AlarmService.init();
   await PrayerDataService.loadAll();
-  await AndroidAlarmManager.initialize();
-
-  // Schedule a daily background task to refresh prayer notifications
-  const int dailyAlarmId = 1;
-  final now = DateTime.now();
-  
-  // Use configurable schedule time from settings
-  final scheduleHour = SettingsService.dailyScheduleHour;
-  final scheduleMinute = SettingsService.dailyScheduleMinute;
-  
-  final startAt = DateTime(now.year, now.month, now.day, scheduleHour, scheduleMinute)
-      .add(const Duration(days: 1));
-  
-  debugPrint('[AlarmManager] Scheduling daily alarm for ${SettingsService.dailyScheduleTime}');
-  
-  try {
-    await AndroidAlarmManager.periodic(
-      const Duration(days: 1),
-      dailyAlarmId,
-      backgroundDailyScheduler,
-      startAt: startAt,
-      exact: true,
-      wakeup: true,
-      // rescheduleOnReboot: true, // Disabled to avoid RebootBroadcastReceiver permission errors
-    );
-    debugPrint('[AlarmManager] Daily background alarm scheduled successfully.');
-  } catch (e, stackTrace) {
-    debugPrint('[AlarmManager] Failed to schedule daily background alarm: $e');
-    debugPrint('[AlarmManager] Stack trace: $stackTrace');
-    // Continue launching the app even if alarm scheduling fails
-  }
   runApp(PrayerApp());
 }
 
@@ -177,6 +82,9 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
   List<Map<String, dynamic>> _suggestions = [];
   Timer? _debounce;
   Timer? _countdownTimer;
+  StreamSubscription? _alarmRingSubscription;
+  double? _lat;
+  double? _lon;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
@@ -197,6 +105,17 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
       if (mounted) setState(() {});
     });
 
+    // Listen for alarm rings and show overlay
+    _alarmRingSubscription = AlarmService.onAlarmRing.listen((alarmSettings) {
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => AlarmOverlayScreen(alarmSettings: alarmSettings),
+          fullscreenDialog: true,
+        ),
+      );
+    });
+
     // Restore saved city
     _restoreSavedCity();
   }
@@ -208,7 +127,11 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     final lon = prefs.getDouble('city_lon');
 
     if (name != null && lat != null && lon != null) {
-      setState(() => selectedCityName = name);
+      setState(() {
+        selectedCityName = name;
+        _lat = lat;
+        _lon = lon;
+      });
       _updatePrayerTimes(lat, lon, save: false);
     }
   }
@@ -218,6 +141,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     _cityController.dispose();
     _debounce?.cancel();
     _countdownTimer?.cancel();
+    _alarmRingSubscription?.cancel();
     _fadeController.dispose();
     super.dispose();
   }
@@ -338,6 +262,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
 
     setState(() {
       prayerTimes = pt;
+      _lat = lat;
+      _lon = lon;
     });
 
     _fadeController.reset();
@@ -357,8 +283,14 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
   }
 
   Future<void> _scheduleNotifications() async {
-    if (prayerTimes == null) return;
-    await scheduleAllPrayerNotifications(prayerTimes!);
+    if (_lat == null || _lon == null) return;
+    final coords = Coordinates(_lat!, _lon!);
+    final params = CalculationMethod.singapore.getParameters();
+    params.madhab = Madhab.shafi;
+    await AlarmService.scheduleAllPrayerAlarms(
+      coordinates: coords,
+      params: params,
+    );
   }
 
   void _showError(String msg) {
@@ -418,9 +350,9 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     return FloatingActionButton(
       backgroundColor: Colors.orange.shade700,
       mini: true,
-      tooltip: 'Preview notifications (DEV)',
+      tooltip: 'Test alarm (DEV)',
       onPressed: _showDebugSheet,
-      child: const Icon(Icons.bug_report, size: 20),
+      child: const Icon(Icons.alarm, size: 20),
     );
   }
 
@@ -441,47 +373,44 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  '🔔 Preview Notification',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    '⏰ Test Alarm (fires in 5s)',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ),
-              ),
-              ...List.generate(prayerKeys.length, (i) {
-                final msg = PrayerDataService.getMessageForToday(prayerKeys[i]);
-                return ListTile(
-                  leading: Icon(
-                    Icons.notifications_active,
-                    color: Colors.orange.shade400,
-                    size: 22,
-                  ),
-                  title: Text(
-                    prayerLabels[i],
-                    style: GoogleFonts.poppins(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w500,
+                ...List.generate(prayerKeys.length, (i) {
+                  return ListTile(
+                    leading: Icon(
+                      Icons.alarm,
+                      color: Colors.orange.shade400,
+                      size: 22,
                     ),
-                  ),
-                  subtitle: Text(
-                    msg?.title ?? '(no data)',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
+                    title: Text(
+                      prayerLabels[i],
+                      style: GoogleFonts.poppins(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _previewNotification(prayerKeys[i], prayerLabels[i]);
-                  },
-                );
-              }),
+                    subtitle: Text(
+                      'Tap to trigger a 5-second test alarm',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _triggerTestAlarm(prayerKeys[i], prayerLabels[i]);
+                    },
+                  );
+                }),
               ],
             ),
           ),
@@ -490,29 +419,25 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     );
   }
 
-  Future<void> _previewNotification(String prayerKey, String label) async {
-    final msg = PrayerDataService.getMessageForToday(prayerKey);
-    await NotificationService.showPrayerNotification(
-      id: 100 + _getPrayerIndex(prayerKey), // Use unique IDs to avoid conflicts
-      prayerName: label,
-      title: msg?.title ?? '$label Reminder',
-      body: msg?.body ?? '$label is coming up soon!',
-      isInstant: true,
-      enableSnooze: true, // Enable snooze for debug notifications too
+  Future<void> _triggerTestAlarm(String prayerKey, String label) async {
+    await AlarmService.scheduleTestAlarm(
+      id: 9000 + prayerLabels.indexOf(label),
+      delay: const Duration(seconds: 5),
+      prayerName: prayerKey, // English key matches CSV cache ('Fajr', 'Dhuhr', etc.)
     );
-  }
-
-  // Helper to get prayer index for unique IDs
-  int _getPrayerIndex(String prayerKey) {
-    switch (prayerKey) {
-      case 'Fajr': return 0;
-      case 'Dhuhr': return 1;
-      case 'Asr': return 2;
-      case 'Maghrib': return 3;
-      case 'Isha': return 4;
-      default: return 0;
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Test alarm for $label fires in 5 seconds!'),
+          backgroundColor: Colors.orange.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
     }
   }
+
+  static const List<String> prayerLabels = ['Subuh', 'Dzuhur', 'Ashar', 'Maghrib', 'Isya'];
 
   Widget _buildHeader() {
     final nextPrayer = _getNextPrayer();

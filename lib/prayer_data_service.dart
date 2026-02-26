@@ -61,13 +61,17 @@ class PrayerDataService {
   }
 
   /// Get today's message for a given prayer.
-  /// Uses day-of-year (1-365) as index, wrapping around.
-  static PrayerMessage? getMessageForToday(String prayerKey) {
+  /// Uses day-of-year (0-based) as index, wrapping around.
+  static PrayerMessage? getMessageForToday(String prayerKey) =>
+      getMessageForDate(prayerKey, DateTime.now());
+
+  /// Get message for a given prayer on [date].
+  /// Uses day-of-year (0-based) as index, wrapping around.
+  static PrayerMessage? getMessageForDate(String prayerKey, DateTime date) {
     final messages = _cache[prayerKey];
     if (messages == null || messages.isEmpty) return null;
 
-    final now = DateTime.now();
-    final dayOfYear = now.difference(DateTime(now.year, 1, 1)).inDays; // 0-based
+    final dayOfYear = date.difference(DateTime(date.year, 1, 1)).inDays; // 0-based
     final index = dayOfYear % messages.length;
 
     return messages[index];
